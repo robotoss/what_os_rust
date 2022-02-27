@@ -1,13 +1,26 @@
+import 'dart:ffi';
+import 'package:ffi/ffi.dart';
+import 'dart:io';
 
-import 'dart:async';
+typedef GreetingFunction = Pointer<Utf8> Function(Pointer<Utf8>);
+typedef GreetingFunctionFFI = Pointer<Utf8> Function(Pointer<Utf8>);
 
-import 'package:flutter/services.dart';
+final DynamicLibrary greeterNative = Platform.isAndroid
+    ? DynamicLibrary.open("libgreeter.so")
+    : DynamicLibrary.process();
 
-class WhatOsRust {
-  static const MethodChannel _channel = MethodChannel('what_os_rust');
+final GreetingFunction rustGreeting = greeterNative
+    .lookup<NativeFunction<GreetingFunctionFFI>>("rust_greeting")
+    .asFunction();
 
-  static Future<String?> get platformVersion async {
-    final String? version = await _channel.invokeMethod('getPlatformVersion');
-    return version;
+/// Wraps the native functions and converts specific data types in order to
+/// handle C strings.
+class Greeter {
+  /// Computes a greeting for the given name using the native function
+  static String greet(String name) {
+    final ptrName = name.toNativeUtf8();
+    final Pointer<Utf8> resultPtr = rustGreeting(ptrName);
+
+    return resultPtr.toDartString();
   }
 }
